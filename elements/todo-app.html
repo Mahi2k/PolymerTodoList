@@ -13,7 +13,6 @@
     <link href="../bower_components/paper-item/paper-item.html" rel="import">
     <link href="../bower_components/paper-input/paper-input.html" rel="import">
     <link href="../bower_components/iron-icons/iron-icons.html" rel="import">
-    <!-- <link href="../bower_components/pubnub-element/pubnub-element.html" rel="import"> -->
 
 </head>
 
@@ -44,7 +43,6 @@
         
         paper-material {
             background-color: #fff;
-            max-width: 640px;
             width: 95%;
             margin: 25px auto;
             position: relative;
@@ -119,10 +117,6 @@
     <paper-header-panel main class="main-panel">
         <paper-toolbar>
             <paper-icon-button icon="menu" paper-drawer-toggle></paper-icon-button>
-            <paper-item>
-                <iron-icon icon="icons:face"></iron-icon>
-                <span id="here">0</span>
-            </paper-item>
             <paper-item>Active Tasks</paper-item>
         </paper-toolbar>
         <div style="border-left: 1px solid #ccc;">
@@ -145,10 +139,6 @@
         </div>
     </paper-header-panel>
     </paper-drawer-panel>
-    <!-- <core-pubnub publish_key="pub-c-7fad26fe-6c38-4940-b9c3-fbd19a9633af" subscribe_key="sub-c-30c17e1a-0007-11e5-a8ef-0619f8945a4f">
-        <core-pubnub-publish id="pub" channel="todo" message="Hello"> </core-pubnub-publish>
-        <core-pubnub-subscribe id="sub" channel="todo" messages="{{messages}}" presence="{{present}}" on-callback="subscribeCallback"></core-pubnub-subscribe>
-    </core-pubnub> -->
     </template>
 </dom-module>
 
@@ -162,23 +152,11 @@
             // declare properties for the element's public API
             todo: {
                 type: Array,
-                value: [{
-                    user: "Shahbaaz",
-                    task: "Drink some Coke",
-                    rid: 1
-                }, {
-                    user: "Rajendra",
-                    task: "Work on Autoslash.",
-                    rid: 2
-                }]
+                value: []
             },
             done: {
                 type: Array,
-                value: [{
-                    user: "Kunal",
-                    task: "Make a Polymer app!",
-                    rid: 0
-                }]
+                value: []
             },
             messages: {
                 type: Array,
@@ -189,44 +167,13 @@
                 value: []
             }
         },
-        handleComplete: function(e) {
-            var idx = findWithAttr(this.todo, 'rid', e.target.rid);
-            var itm = this.todo[idx];
-            itm.task = e.target.task;
-            itm.user = this.$.tUser.value;
-            itm.type = "done";
-            this.$.pub.message = itm;
-            this.$.pub.publish();
-        },
-        handleEdit: function(e) {
-            var idx = findWithAttr(this.todo, 'rid', e.target.rid);
-            var itm = this.todo[idx];
-            itm.task = e.target.task;
-            itm.user = this.$.tUser.value;
-            itm.type = "edit";
-            this.$.pub.message = itm;
-            this.$.pub.publish();
-        },
-        postTask: function(e) {
-            var tsk = this.$.tTask.value;
-            var usr = this.$.tUser.value;
-            if (tsk == "") {
-                alert("Task is Empty!");
-                return;
+        saveToLocalStorage: function() {
+            if (localStorage) {
+                localStorage.setItem("TodoListItems", JSON.stringify(this.todo));
+                localStorage.setItem("DoneListItems", JSON.stringify(this.done));
             }
-            if (usr == "") {
-                usr = randItem(names1) + "-" + randItem(names2);
-            }
-            this.$.pub.message = {
-                type: "todo",
-                task: tsk,
-                user: usr,
-                rid: randID()
-            };
-            this.$.pub.publish();
-            this.$.tTask.value = "";
         },
-        subscribeCallback: function(e) {
+        updateFields: function() {
             while (this.messages.length > 0) {
                 var item = this.messages.pop();
                 switch (item.type) {
@@ -236,6 +183,7 @@
                             user: item.user,
                             rid: item.rid
                         });
+                        this.saveToLocalStorage();
                         break;
                     case "done":
                         var idx = findWithAttr(this.todo, 'rid', item.rid);
@@ -247,6 +195,7 @@
                         itm.task = item.task;
                         itm.user = item.user;
                         this.unshift('done', itm);
+                        this.saveToLocalStorage();
                         break;
                     case "edit":
                         var idx = findWithAttr(this.todo, 'rid', item.rid);
@@ -261,13 +210,71 @@
                             user: item.user,
                             rid: item.rid
                         });
+                        this.saveToLocalStorage();
                         break;
                     default:
                         continue;
                 }
             }
         },
+        handleComplete: function(e) {
+            var idx = findWithAttr(this.todo, 'rid', e.target.rid);
+            var itm = this.todo[idx];
+            itm.task = e.target.task;
+            itm.user = this.$.tUser.value;
+            itm.type = "done";
+            this.$.message = itm;
+            this.messages.push(this.$.message);
+            this.updateFields();
+        },
+        handleEdit: function(e) {
+            var idx = findWithAttr(this.todo, 'rid', e.target.rid);
+            var itm = this.todo[idx];
+            itm.task = e.target.task;
+            itm.user = this.$.tUser.value;
+            itm.type = "edit";
+            this.$.message = itm;
+            this.messages.push(this.$.message);
+            this.updateFields();
+        },
+        postTask: function(e) {
+            var tsk = this.$.tTask.value;
+            var usr = this.$.tUser.value;
+            if (tsk == "") {
+                alert("Task is Empty!");
+                return;
+            }
+            if (usr == "") {
+                usr = randItem(names1) + "-" + randItem(names2);
+            }
+            this.$.message = {
+                type: "todo",
+                task: tsk,
+                user: usr,
+                rid: randID()
+            };
+            this.messages.push(this.$.message);
+            this.updateFields();
+            this.$.tTask.value = "";
+        },
         ready: function(e) {
+
+            if (localStorage) {
+                var storedTodoTasks = JSON.parse(localStorage.getItem("TodoListItems"));
+                var doneTodoTasks = JSON.parse(localStorage.getItem("DoneListItems"));
+
+                if (storedTodoTasks && doneTodoTasks) {
+                    this.set("todo", storedTodoTasks);
+                    this.set("done", doneTodoTasks);
+                } else {
+                    localStorage.setItem("TodoListItems", []);
+                    localStorage.setItem("DoneListItems", []);
+                }
+
+            } else {
+                console.log("'localStorage' variable not supported please update your browser..!!")
+            }
+
             this.addEventListener('complete', this.handleComplete);
             this.addEventListener('edit', this.handleEdit);
             this.$.tUser.value = randItem(names1) + "-" + randItem(names2);
